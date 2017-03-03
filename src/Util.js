@@ -1,9 +1,9 @@
 'use strict';
 
-var FFmpeg = require('fluent-ffmpeg')
-  , fs = require('fs')
-  , moment = require('moment');
-
+let FFmpeg = require('fluent-ffmpeg');
+let fs = require('fs');
+let moment = require('moment');
+let Promise = require('bluebird');
 
 /**
  * generateThumbnails() callback
@@ -16,35 +16,35 @@ var FFmpeg = require('fluent-ffmpeg')
 /**
  * Generate thumbnails
  *
- * @param {string} inputVideo Path to video file
- * @param {object} options No comments
- * @param {thumbnailsCallback} callback Accepts arguments: (err, filenames)
+ * @param {string} input all the information
  */
-exports.generateThumbnails = function (inputVideo, options, callback) {
-  new FFmpeg({source: inputVideo})
-    .on('error', onError)
-    .on('filenames', onFileName)
-    .on('end', onSuccess)
-    .takeScreenshots(
-      {
-        size: parseInt(options.thumbnailSize.width) + 'x' + options.thumbnailSize.height,
-        timemarks: options.timemarks,
-        filename: '%s.png'
-      },
-      options.outputThumbnailDirectory
-    );
+exports.generateThumbnails = function (input) {
+  return new Promise(function (resolve, reject) {
+    new FFmpeg({source: input.inputVideo})
+      .on('error', onError)
+      .on('filenames', onFileName)
+      .on('end', onSuccess)
+      .takeScreenshots(
+        {
+          size: parseInt(input.options.thumbnailSize.width) + 'x' + input.options.thumbnailSize.height,
+          timemarks: input.options.timemarks,
+          filename: '%s.png'
+        },
+        input.options.outputThumbnailDirectory
+      );
 
-  function onFileName(filenames) {
-    this.filenames = filenames;
-  }
+    function onFileName(filenames) {
+      this.filenames = filenames;
+    }
 
-  function onError(err) {
-    callback(err)
-  }
+    function onError(err) {
+      reject(err)
+    }
 
-  function onSuccess() {
-    callback(null, this.filenames)
-  }
+    function onSuccess() {
+      resolve(this.filenames);
+    }
+  })
 };
 
 
@@ -60,50 +60,53 @@ exports.generateThumbnails = function (inputVideo, options, callback) {
  * Get simple metadata for video
  *
  * @param {string} inputVideo Path to video file
- * @param {metadataCallback} callback Accepts arguments: (err, metadata)
  */
-exports.metadata = function (inputVideo, callback) {
-  FFmpeg.ffprobe(inputVideo, onData);
+exports.metadata = function (inputVideo) {
+  return new Promise(function (resolve, reject) {
+    FFmpeg.ffprobe(inputVideo, onData);
 
-  function onData(err, metadata) {
-    if (err) {
-      return callback(err)
-    }
-
-    var streams = metadata.streams
-      , stream;
-
-    if (!streams) {
-      return callback(new Error('Unknown error running ffprobe'))
-    }
-
-    while (stream = streams.shift()) {
-      if (stream.codec_type === 'video') {
-        return callback(null, {
-          duration: parseFloat(metadata.format.duration),
-          width: parseInt(stream.width, 10),
-          height: parseInt(stream.height, 10),
-          fps: parseInt((stream.r_frame_rate || stream.avg_frame_rate).replace(/\/1/, ''), 10)
-        })
+    function onData(err, metadata) {
+      if (err) {
+        reject(err)
       }
-    }
 
-    return callback(new Error('Source video file does not have video stream.'))
-  }
+      let streams = metadata.streams;
+      let stream;
+
+      if (!streams) {
+        reject(err)
+      }
+
+      while (stream = streams.shift()) {
+        if (stream.codec_type === 'video') {
+          const result = {
+            duration: parseFloat(metadata.format.duration),
+            width: parseInt(stream.width, 10),
+            height: parseInt(stream.height, 10),
+            fps: parseInt((stream.r_frame_rate || stream.avg_frame_rate).replace(/\/1/, ''), 10)
+          };
+          resolve(result)
+        }
+      }
+      reject(new Error('Source video file does not have video stream.'))
+    }
+  })
 };
 
-exports.deleteFiles = function (files, callback) {
-  var i = files.length;
-  files.forEach(function (path) {
-    fs.unlink(path, function (err) {
-      i--;
-      if (err) {
-        callback(err);
-      } else if (i <= 0) {
-        callback(null);
-      }
+exports.deleteFiles = function (files) {
+  return new Promise(function (resolve, reject) {
+    let i = files.length;
+    files.forEach(function (path) {
+      fs.unlink(path, function (err) {
+        i--;
+        if (err) {
+          reject(err);
+        } else if (i <= 0) {
+          resolve(null);
+        }
+      });
     });
-  });
+  })
 };
 
 /**
@@ -113,6 +116,6 @@ exports.deleteFiles = function (files, callback) {
  * @returns {string} Formatted timemark
  */
 exports.toTimemark = function (mark) {
-  var m = moment(mark + '', 'X.SSS');
+  const m = moment(mark + '', 'X.SSS');
   return m.utc().format('HH:mm:ss.SSS')
 };

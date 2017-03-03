@@ -1,12 +1,10 @@
-'use strict';
-
-var path = require('path')
-  , SpriteSheetWriter = require('./SpriteImages')
-  , Utils = require('./Util');
+let path = require('path');
+let SpriteImages = require('./SpriteImages');
+let Utils = require('./Util');
+let Promise = require('bluebird');
 
 
 /**
- *
  * @callback thumbgenCallback
  * @param {Error} err Any error
  * @param {object} metadata Metadata
@@ -20,110 +18,99 @@ var path = require('path')
  * @param {thumbgenCallback} callback Accepts arguments: (err, metadata)
  */
 module.exports = function (inputVideo, options, callback) {
+
   if (!inputVideo) {
     return callback(new Error('Source video file is not specified'))
-  }
-  else if (!options.secondsPerThumbnail && !options.framesPerThumbnail && !options.timemarks) {
-    return callback(new Error('You should specify the way timemarks are calculated'))
-  }
-
-  var videoExtension = path.extname(inputVideo)
-    , videoBaseName = path.basename(inputVideo, videoExtension)
-    , metadata;
-
-  if (!options.outputDirectory) {
-    return callback(new Error('You should specify an output directory'));
+  } else if (!options.secondsPerThumbnail && !options.framesPerThumbnail && !options.timemarks) {
+    return callback(new Error('You should specify the way timemarks are calculated.'))
+  } else if (!options.outputDirectory) {
+    return callback(new Error('You should specify an output directory.'));
+  } else if (!options.outputFileName) {
+    return callback(new Error('You should specify an output file name.'));
   }
 
   options.inputVideoPath = inputVideo;
-  options.outputWebVTTPath = path.join(options.outputDirectory, videoBaseName + '.vtt');
-  options.spritesImagePath = path.join(options.outputDirectory, videoBaseName + '.png');
+  options.outputWebVTTPath = path.join(options.outputDirectory, options.outputFileName + '.vtt');
+  options.spritesImagePath = path.join(options.outputDirectory, options.outputFileName + '.png');
   options.outputThumbnailDirectory = options.outputDirectory;
 
-  Utils.metadata(inputVideo, onMetadata);
+  Utils.metadata(inputVideo)
+    .then(metadataHandler)
+    .then(Utils.generateThumbnails)
+    .then(generateResult)
+    .then(callback)
+    .catch(callback);
 
-  function onMetadata(err, data) {
-    if (err) {
-      return callback(err)
-    }
-
-    metadata = data;
-
-    if (!options.timemarks) {
-      options.timemarks = []
-    }
-    options.thumbnailTimeBounds = [];
-
-    var mark;
-
-    if (options.secondsPerThumbnail) {
-      mark = 0;
-
-      while (mark < metadata.duration) {
-        options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
-        options.timemarks.push(Number(mark).toFixed(3));
-
-        mark += options.secondsPerThumbnail
+  function metadataHandler(data) {
+    return new Promise(function (resolve, reject) {
+      metadata = data;
+      if (!options.timemarks) {
+        options.timemarks = []
       }
-    }
-    else if (options.framesPerThumbnail) {
-      mark = 0;
+      options.thumbnailTimeBounds = [];
 
-      while (mark < metadata.duration) {
-        options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
-        options.timemarks.push(Number(mark).toFixed(3));
+      let mark;
+      if (options.secondsPerThumbnail) {
+        mark = 0;
 
-        if (!metadata.fps) {
-          return callback(new Error('Can\'t determine video FPS.'))
+        while (mark < metadata.duration) {
+          options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
+          options.timemarks.push(Number(mark).toFixed(3));
+
+          mark += options.secondsPerThumbnail
         }
-
-        mark += options.framesPerThumbnail / metadata.fps
       }
-    }
-
-    if (!options.thumbnailSize) {
-      options.thumbnailSize = {
-        width: metadata.width,
-        height: metadata.height
+      else if (options.framesPerThumbnail) {
+        mark = 0;
+        while (mark < metadata.duration) {
+          options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
+          options.timemarks.push(Number(mark).toFixed(3));
+          if (!metadata.fps) {
+            return callback(new Error('Can\'t determine video FPS.'))
+          }
+          mark += options.framesPerThumbnail / metadata.fps
+        }
       }
-    }
-    else if (!options.thumbnailSize.height) {
-      options.thumbnailSize.height = options.thumbnailSize.width * metadata.height / metadata.width
-    }
-    else if (!options.thumbnailSize.width) {
-      options.thumbnailSize.width = options.thumbnailSize.height * metadata.width / metadata.height
-    }
 
-    Utils.generateThumbnails(
-      inputVideo,
-      {
-        outputThumbnailDirectory: options.outputThumbnailDirectory,
-        thumbnailSize: options.thumbnailSize,
-        timemarks: options.timemarks
-      },
-      onGenerate
-    )
+      if (!options.thumbnailSize) {
+        options.thumbnailSize = {
+          width: metadata.width,
+          height: metadata.height
+        }
+      }
+      else if (!options.thumbnailSize.height) {
+        options.thumbnailSize.height = options.thumbnailSize.width * metadata.height / metadata.width
+      }
+      else if (!options.thumbnailSize.width) {
+        options.thumbnailSize.width = options.thumbnailSize.height * metadata.width / metadata.height
+      }
+
+      const result = {
+        inputVideo: inputVideo,
+        options: {
+          outputThumbnailDirectory: options.outputThumbnailDirectory,
+          thumbnailSize: options.thumbnailSize,
+          timemarks: options.timemarks
+        }
+      };
+      resolve(result);
+    });
   }
 
-  function onGenerate(err, filenames) {
-    if (err) {
-      return callback(err)
-    }
+  function generateResult(filenames) {
+    return new Promise(function (resolve, reject) {
+      let writer;
+      writer = new SpriteImages(metadata, options, filenames);
+      writer.on('error', onError);
+      writer.on('success', onSuccess);
 
-    var writer;
-    writer = new SpriteSheetWriter(metadata, options, filenames);
+      function onError(err) {
+        reject(err);
+      }
 
-    writer.on('error', onError);
-    writer.on('success', onSuccess)
-  }
-
-  function onError(err) {
-    callback(err)
-  }
-
-  function onSuccess(data) {
-    callback(null, {
-      thumbnailsData: data
-    })
+      function onSuccess(data) {
+        resolve(data);
+      }
+    });
   }
 };

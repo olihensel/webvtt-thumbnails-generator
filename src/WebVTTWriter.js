@@ -1,9 +1,9 @@
 'use strict';
 
-var fs = require('fs')
-  , util = require('util')
-  , utils = require('./Util')
-  , Writable = require('stream').Writable;
+let fs = require('fs');
+let util = require('util');
+let utils = require('./Util');
+let Writable = require('stream').Writable;
 
 
 /**
@@ -17,7 +17,7 @@ var fs = require('fs')
  */
 function WebVTTWriter(metadata, options, filenames) {
   Writable.call(this, options);
-  var self = this;
+  let self = this;
 
   this.metadata = metadata;
   this.options = options;
@@ -67,19 +67,19 @@ WebVTTWriter.prototype._write = function (str, encoding, callback) {
  * @param {string[]} thumbnails List of thumbnails filenames
  */
 WebVTTWriter.prototype._writeInfo = function (thumbnails) {
-  var self = this
-    , bounds = this.options.thumbnailTimeBounds
-    , length = thumbnails.length
-    , thumbnail
-    , i = 0
-    , bound
-    , out = [];
+  let self = this;
+  let thumbnailTimeBounds = this.options.thumbnailTimeBounds;
+  let length = thumbnails.length;
+  let element;
+  let i = 0;
+  let bound;
+  let out = [];
 
-  while (thumbnail = thumbnails[i]) {
-    bound = bounds[i];
+  while (element = thumbnails[i]) {
+    bound = thumbnailTimeBounds[i];
 
-    var data = {
-      path: thumbnail,
+    const data = {
+      path: element,
       from: utils.toTimemark(bound)
     };
 
@@ -87,7 +87,7 @@ WebVTTWriter.prototype._writeInfo = function (thumbnails) {
       data.to = utils.toTimemark(Number(this.metadata.duration).toFixed(3))
     }
     else {
-      data.to = utils.toTimemark(bounds[i + 1])
+      data.to = utils.toTimemark(thumbnailTimeBounds[i + 1])
     }
 
     out.push(data);

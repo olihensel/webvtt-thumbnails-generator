@@ -1,5 +1,6 @@
 let path = require('path');
 let SpriteImages = require('./SpriteImages');
+let PlainImages = require('./PlainImages');
 let Utils = require('./Util');
 let Promise = require('bluebird');
 
@@ -99,8 +100,15 @@ module.exports = function (inputVideo, options, callback) {
 
   function generateResult(filenames) {
     return new Promise(function (resolve, reject) {
+
       let writer;
-      writer = new SpriteImages(metadata, options, filenames);
+      if (options.spriteImages) {
+        writer = new SpriteImages(metadata, options, filenames);
+      }
+      else {
+        writer = new PlainImages(metadata, options, filenames);
+      }
+
       writer.on('error', onError);
       writer.on('success', onSuccess);
 

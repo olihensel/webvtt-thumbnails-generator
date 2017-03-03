@@ -6,7 +6,7 @@ let Layout = require('layout');
 let _ = require('lodash');
 let path = require('path');
 let util = require('util');
-let Writer = require('./WebVTTWriter');
+let WebVTTWriter = require('./WebVTTWriter');
 let Util = require('./Util');
 let fs = Promise.promisifyAll(require('fs-extra'));
 
@@ -15,10 +15,10 @@ let fs = Promise.promisifyAll(require('fs-extra'));
  * Creates spritesheet then writes files
  *
  * @constructor
- * @extends {Writer}
+ * @extends {WebVTTWriter}
  */
 function SpriteImages(metadata, options, filenames) {
-  Writer.call(this, metadata, options, filenames);
+  WebVTTWriter.call(this, metadata, options, filenames);
 
   const self = this;
   let src = [];
@@ -102,7 +102,7 @@ function SpriteImages(metadata, options, filenames) {
       })
   }
 }
-util.inherits(SpriteImages, Writer);
+util.inherits(SpriteImages, WebVTTWriter);
 
 
 module.exports = SpriteImages;

@@ -2,7 +2,7 @@
   "name": "webvtt-thumbnails-genetor",
   "description": "Create sprite thumbnails and WebVTT file.",
   "author": "JUNYUAN ZHENG <joseph.zjy@gmail.com>",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "main": "src/index.js",
   "keywords": [

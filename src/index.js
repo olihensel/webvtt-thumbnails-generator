@@ -1,9 +1,9 @@
+// @ts-check
 let path = require('path');
 let SpriteImages = require('./SpriteImages');
 let PlainImages = require('./PlainImages');
 let Utils = require('./Util');
-let Promise = require('bluebird');
-
+let fs = require('fs');
 
 /**
  * @callback thumbgenCallback
@@ -16,37 +16,31 @@ let Promise = require('bluebird');
  *
  * @param {string} inputVideo Video file
  * @param {object} options Various options
- * @param {thumbgenCallback} callback Accepts arguments: (err, metadata)
  */
-module.exports = function (inputVideo, options, callback) {
-
+module.exports = function (inputVideo, options) {
   if (!inputVideo) {
-    return callback(new Error('Source video file is not specified'))
+    throw new Error('Source video file is not specified');
   } else if (!options.secondsPerThumbnail && !options.framesPerThumbnail && !options.timemarks) {
-    return callback(new Error('You should specify the way timemarks are calculated.'))
+    throw new Error('You should specify the way timemarks are calculated.');
   } else if (!options.outputDirectory) {
-    return callback(new Error('You should specify an output directory.'));
+    throw new Error('You should specify an output directory.');
   } else if (!options.outputFileName) {
-    return callback(new Error('You should specify an output file name.'));
+    throw new Error('You should specify an output file name.');
   }
 
   options.inputVideoPath = inputVideo;
   options.outputWebVTTPath = path.join(options.outputDirectory, options.outputFileName + '.vtt');
-  options.spritesImagePath = path.join(options.outputDirectory, options.outputFileName + '.png');
-  options.outputThumbnailDirectory = options.outputDirectory;
-
-  Utils.metadata(inputVideo)
-    .then(metadataHandler)
-    .then(Utils.generateThumbnails)
-    .then(generateResult)
-    .then(callback)
-    .catch(callback);
-
+  options.spritesImagePath = path.join(options.outputDirectory, options.outputFileName + '.jpg');
+  if (!fs.existsSync(options.outputDirectory)) {
+    fs.mkdirSync(options.outputDirectory);
+  }
+  options.outputThumbnailDirectory = path.join(options.outputDirectory, 'thumbs_' + options.outputFileName);
+  let metadata = undefined;
   function metadataHandler(data) {
     return new Promise(function (resolve, reject) {
       metadata = data;
       if (!options.timemarks) {
-        options.timemarks = []
+        options.timemarks = [];
       }
       options.thumbnailTimeBounds = [];
 
@@ -58,41 +52,39 @@ module.exports = function (inputVideo, options, callback) {
           options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
           options.timemarks.push(Number(mark).toFixed(3));
 
-          mark += options.secondsPerThumbnail
+          mark += options.secondsPerThumbnail;
         }
-      }
-      else if (options.framesPerThumbnail) {
+      } else if (options.framesPerThumbnail) {
         mark = 0;
         while (mark < metadata.duration) {
           options.thumbnailTimeBounds.push(Number(mark).toFixed(3));
           options.timemarks.push(Number(mark).toFixed(3));
           if (!metadata.fps) {
-            return callback(new Error('Can\'t determine video FPS.'))
+            throw new Error("Can't determine video FPS.");
           }
-          mark += options.framesPerThumbnail / metadata.fps
+          mark += options.framesPerThumbnail / metadata.fps;
         }
       }
 
       if (!options.thumbnailSize) {
         options.thumbnailSize = {
           width: metadata.width,
-          height: metadata.height
-        }
-      }
-      else if (!options.thumbnailSize.height) {
-        options.thumbnailSize.height = options.thumbnailSize.width * metadata.height / metadata.width
-      }
-      else if (!options.thumbnailSize.width) {
-        options.thumbnailSize.width = options.thumbnailSize.height * metadata.width / metadata.height
+          height: metadata.height,
+        };
+      } else if (!options.thumbnailSize.height) {
+        options.thumbnailSize.height = (options.thumbnailSize.width * metadata.height) / metadata.width;
+      } else if (!options.thumbnailSize.width) {
+        options.thumbnailSize.width = (options.thumbnailSize.height * metadata.width) / metadata.height;
       }
 
       const result = {
         inputVideo: inputVideo,
+        metadata,
         options: {
           outputThumbnailDirectory: options.outputThumbnailDirectory,
           thumbnailSize: options.thumbnailSize,
-          timemarks: options.timemarks
-        }
+          timemarks: options.timemarks,
+        },
       };
       resolve(result);
     });
@@ -100,12 +92,10 @@ module.exports = function (inputVideo, options, callback) {
 
   function generateResult(filenames) {
     return new Promise(function (resolve, reject) {
-
       let writer;
       if (options.spriteImages) {
         writer = new SpriteImages(metadata, options, filenames);
-      }
-      else {
+      } else {
         writer = new PlainImages(metadata, options, filenames);
       }
 
@@ -121,4 +111,5 @@ module.exports = function (inputVideo, options, callback) {
       }
     });
   }
+  return Utils.metadata(inputVideo).then(metadataHandler).then(Utils.generateThumbnails).then(generateResult);
 };

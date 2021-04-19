@@ -1,9 +1,8 @@
 'use strict';
 
-let FFmpeg = require('fluent-ffmpeg');
+let ffmpeg = require('fluent-ffmpeg');
 let fs = require('fs');
 let moment = require('moment');
-let Promise = require('bluebird');
 
 /**
  * generateThumbnails() callback
@@ -20,7 +19,14 @@ let Promise = require('bluebird');
  */
 exports.generateThumbnails = function (input) {
   return new Promise(function (resolve, reject) {
-    new FFmpeg({source: input.inputVideo})
+    ffmpeg(input.inputVideo, {
+      logger: {
+        debug: console.log,
+        info: console.log,
+        warn: console.log,
+        error: console.log,
+      },
+    })
       .on('error', onError)
       .on('filenames', onFileName)
       .on('end', onSuccess)
@@ -28,7 +34,7 @@ exports.generateThumbnails = function (input) {
         {
           size: parseInt(input.options.thumbnailSize.width) + 'x' + input.options.thumbnailSize.height,
           timemarks: input.options.timemarks,
-          filename: '%s.png'
+          filename: '%s.png',
         },
         input.options.outputThumbnailDirectory
       );
@@ -37,16 +43,16 @@ exports.generateThumbnails = function (input) {
       this.filenames = filenames;
     }
 
-    function onError(err) {
-      reject(err)
+    function onError(err, stdout, stderr) {
+      console.log('error ffmpeg', stdout, stderr);
+      reject(err);
     }
 
     function onSuccess() {
       resolve(this.filenames);
     }
-  })
+  });
 };
-
 
 /**
  * metadata() callback
@@ -63,34 +69,33 @@ exports.generateThumbnails = function (input) {
  */
 exports.metadata = function (inputVideo) {
   return new Promise(function (resolve, reject) {
-    FFmpeg.ffprobe(inputVideo, onData);
+    ffmpeg.ffprobe(inputVideo, onData);
 
     function onData(err, metadata) {
       if (err) {
-        reject(err)
+        reject(err);
       }
-
       let streams = metadata.streams;
       let stream;
 
       if (!streams) {
-        reject(err)
+        reject(err);
       }
 
-      while (stream = streams.shift()) {
+      while ((stream = streams.shift())) {
         if (stream.codec_type === 'video') {
           const result = {
             duration: parseFloat(metadata.format.duration),
             width: parseInt(stream.width, 10),
             height: parseInt(stream.height, 10),
-            fps: parseInt((stream.r_frame_rate || stream.avg_frame_rate).replace(/\/1/, ''), 10)
+            fps: parseInt((stream.r_frame_rate || stream.avg_frame_rate).replace(/\/1/, ''), 10),
           };
-          resolve(result)
+          resolve(result);
         }
       }
-      reject(new Error('Source video file does not have video stream.'))
+      reject(new Error('Source video file does not have video stream.'));
     }
-  })
+  });
 };
 
 exports.deleteFiles = function (files) {
@@ -106,7 +111,7 @@ exports.deleteFiles = function (files) {
         }
       });
     });
-  })
+  });
 };
 
 /**
@@ -117,5 +122,5 @@ exports.deleteFiles = function (files) {
  */
 exports.toTimemark = function (mark) {
   const m = moment(mark + '', 'X.SSS');
-  return m.utc().format('HH:mm:ss.SSS')
+  return m.utc().format('HH:mm:ss.SSS');
 };

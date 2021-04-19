@@ -5,7 +5,6 @@ let util = require('util');
 let utils = require('./Util');
 let Writable = require('stream').Writable;
 
-
 /**
  * Abstract WebVTT writer. Should be extended
  *
@@ -27,22 +26,21 @@ function WebVTTWriter(metadata, options, filenames) {
   // write header first
   this.ws.write('WEBVTT', 'utf8');
 
-
   this.ws.on('error', onError);
   this.on('internalError', onIternalError);
   this.on('finish', onFinish);
 
   function onError(err) {
-    self.emit('error', err)
+    self.emit('error', err);
   }
 
   function onIternalError() {
     self.emit('error');
-    self.ws.end()
+    self.ws.end();
   }
 
   function onFinish() {
-    self.ws.end()
+    self.ws.end();
   }
 }
 util.inherits(WebVTTWriter, Writable);
@@ -56,9 +54,8 @@ util.inherits(WebVTTWriter, Writable);
  * @param {function} callback Accepts arguments: (err, data)
  */
 WebVTTWriter.prototype._write = function (str, encoding, callback) {
-  this.ws.write(str, encoding, callback)
+  this.ws.write(str, encoding, callback);
 };
-
 
 /**
  * Write thumbnails specs to VTT
@@ -75,33 +72,31 @@ WebVTTWriter.prototype._writeInfo = function (thumbnails) {
   let bound;
   let out = [];
 
-  while (element = thumbnails[i]) {
+  while ((element = thumbnails[i])) {
     bound = thumbnailTimeBounds[i];
 
     const data = {
       path: element,
-      from: utils.toTimemark(bound)
+      from: utils.toTimemark(bound),
     };
 
     if (i === length - 1) {
-      data.to = utils.toTimemark(Number(this.metadata.duration).toFixed(3))
-    }
-    else {
-      data.to = utils.toTimemark(thumbnailTimeBounds[i + 1])
+      data.to = utils.toTimemark(Number(this.metadata.duration).toFixed(3));
+    } else {
+      data.to = utils.toTimemark(thumbnailTimeBounds[i + 1]);
     }
 
     out.push(data);
     this.write(this.toThumbString(data));
 
-    i++
+    i++;
   }
 
   this.end();
   this.on('finish', function () {
-    self.emit('success', out)
-  })
+    self.emit('success', out);
+  });
 };
-
 
 /**
  * Write thumbnail data
@@ -111,8 +106,7 @@ WebVTTWriter.prototype._writeInfo = function (thumbnails) {
  * @returns {string} Thumbnail string
  */
 WebVTTWriter.prototype.toThumbString = function (data) {
-  return ['\n\n', data.from, ' --> ', data.to, '\n', data.path].join('')
+  return ['\n\n', data.from, ' --> ', data.to, '\n', data.path].join('');
 };
-
 
 module.exports = WebVTTWriter;

@@ -4,7 +4,6 @@ let path = require('path');
 let util = require('util');
 let WebVTTWriter = require('./WebVTTWriter');
 
-
 /**
  * Plain writer writes info about thumbnails to WebVTT
  * without creating spritesheet.
@@ -19,14 +18,13 @@ function PlainImages(metadata, options, filenames) {
   let thumbnail;
   let i = 0;
 
-  while (thumbnail = filenames[i++]) {
+  while ((thumbnail = filenames[i++])) {
     const imagePath = util.format('/%s', path.join(options.outputDirectory, thumbnail));
-    thumbnailPaths.push(imagePath)
+    thumbnailPaths.push(imagePath);
   }
 
-  this._writeInfo(thumbnailPaths)
+  this._writeInfo(thumbnailPaths);
 }
 util.inherits(PlainImages, WebVTTWriter);
-
 
 module.exports = PlainImages;
